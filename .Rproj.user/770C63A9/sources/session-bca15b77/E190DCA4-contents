@@ -1,0 +1,611 @@
+#
+# day 20230119 #
+#
+
+
+library(tidyverse)
+library(data.table)
+
+path_parent <- '/home/jcscabral/Studies/UspEsalq/pesquisa/20240119/'
+
+
+
+################
+### KEYBOARD ###
+################
+
+
+
+file <- 'keyboardData.csv'  
+path_csv <- paste(path_parent, file, sep = '')
+keyboard <- fread(path_csv)
+cnames <- c('user_id', 'action_number', 'app_action', 'pointer_event_type', 
+            'character', 'pressure', 'x', 'y', 'uptime')  
+names(keyboard) <- cnames
+
+ids <- unique(keyboard[keyboard$action_number == 7,]$user_id)
+ids_error1 <- ids[ids !=11 & ids !=2]
+
+# (I)  7, 8 twice
+# (II)   all started w/ 2
+# (III)  2 logged out
+# (IV)  11 started w/ 3
+
+plot(keyboard[keyboard$user_id == 7,]$action_number)
+View(keyboard[keyboard$user_id == 2,])
+
+
+
+###################
+# Fix [error I] #
+###################
+
+
+
+keyboard$diff_time <- 0
+
+id <- 7
+
+keyboard[keyboard$user_id == id]$diff_time <-
+  c(0, diff(keyboard[keyboard$user_id == id,]$uptime))
+max(indices)
+indices <- which(keyboard$user_id == 7)
+id_last <- which(keyboard$user_id == id & 
+                   keyboard$diff_time > 100000)
+
+indices_to_delete <- c((id_last + 1): max(indices))
+keyboard <- keyboard[-indices_to_delete]
+
+View(keyboard[keyboard$user_id == id])
+plot(keyboard[keyboard$user_id == id,]$action_number)
+
+
+id <- 8
+
+keyboard[keyboard$user_id == id]$diff_time <-
+  c(0, diff(keyboard[keyboard$user_id == id,]$uptime))
+max(indices)
+indices <- which(keyboard$user_id == id)
+id_last <- which(keyboard$user_id == id & 
+                   keyboard$diff_time > 100000)
+
+indices_to_delete <- c((id_last + 1): max(indices))
+keyboard <- keyboard[-indices_to_delete]
+
+View(keyboard[keyboard$user_id == id])
+plot(keyboard[keyboard$user_id == id,]$action_number)
+
+
+
+##############
+# [error II] #
+##############
+
+
+
+KEYBOARD_AUTH <- 6
+
+for (id in ids_error1){
+  
+  id_indices <- which(keyboard$user_id == id &
+                       keyboard$action_number < 3)
+  
+  first_index_auth <- match(c(KEYBOARD_AUTH), 
+                            keyboard[id_indices]$app_action)
+  
+  user <- keyboard[id_indices]
+  i <- first_index_auth
+  while (user$app_action[i] == KEYBOARD_AUTH) {
+    i <- i+1
+  }
+  
+  start_indice <- id_indices[1]
+  end_indice <- id_indices[i - 1]   
+  keyboard[start_indice:end_indice]$action_number <-1
+  
+}
+
+
+
+####################
+# [error III]
+# case user_id == 2
+# user logged off
+####################
+
+
+
+KEYBOARD_AUTH <- 6
+
+# fix first action_number 0
+id_indices <- which(keyboard$user_id == 2 &
+                      keyboard$action_number < 3)
+
+first_index_auth <- match(c(KEYBOARD_AUTH),
+                          keyboard[id_indices]$app_action)
+
+user = keyboard[id_indices]
+i <- first_index_auth
+while (user$app_action[i] == KEYBOARD_AUTH) {
+  i <- i+1
+}
+
+start_indice <- id_indices[1]
+end_indice <- id_indices[i - 1]   
+keyboard[start_indice:end_indice]$action_number <-0
+
+id_indices <- which(keyboard$user_id == 2 &
+                      keyboard$action_number == 2)
+
+
+# fix first action_number 1
+first_index_auth <- match(c(KEYBOARD_AUTH),
+                          keyboard[id_indices]$app_action)
+
+user = keyboard[id_indices]
+i <- first_index_auth
+while (user$app_action[i] == KEYBOARD_AUTH) {
+  i <- i+1
+}
+
+start_indice <- id_indices[1]
+end_indice <- id_indices[i - 1]   
+keyboard[start_indice:end_indice]$action_number <-1
+
+
+
+############################
+# [error IV]
+# case user_id == 11
+# action_number starts w/ 3
+############################
+
+
+
+previous_action = 3
+id_error2 <- which(keyboard$user_id == 11)
+first_index_auth <- match(previous_action, 
+                          keyboard[keyboard$user_id==11]$action_number)
+user <- keyboard[id_error2]
+i = first_index_auth
+while (user$action_number[i] == previous_action) {
+  i <- i+1
+}  
+start_indice <- id_error2[1]
+end_indice <- id_error2[i - 1]   
+keyboard[start_indice:end_indice]$action_number <-1
+
+
+
+###########
+# Grouping 
+###########
+
+
+base <- keyboard %>%
+  group_by(user_id, action_number)
+
+description = base %>%
+  summarise(
+    action_number = mean(action_number),
+    obs = n()
+  )
+
+
+
+################################################################################
+
+
+
+#############
+### SWIPE ###
+#############
+
+
+
+file = 'swipeData.csv'
+path_csv = paste(path_parent,file, sep = '')
+swipe = fread(path_csv)
+cnames <- c('user_id', 'action_number', 'app_action', 'pointer_event_type', 
+            'pressure', 'x', 'y', 'uptime')  
+names(swipe) <- cnames
+
+ids <- unique(swipe[swipe$action_number == 7,]$user_id)
+plot(swipe[swipe$user_id == 2,]$action_number)
+ids_error1 <- ids[ids !=11 & ids !=2]
+
+
+
+#################
+# Fix [error I] #
+#################
+
+
+
+swipe$diff_time <- 0
+
+id <- 7
+
+swipe[swipe$user_id == id]$diff_time <-
+  c(0, diff(swipe[swipe$user_id == id,]$uptime))
+
+max_diff_time <- max(swipe$diff_time)
+
+indices <- which(swipe$user_id == id)
+id_last <- which(swipe$user_id == id & 
+                   swipe$diff_time == max_diff_time)
+
+indices_to_delete <- c((id_last + 1): max(indices))
+swipe <- swipe[-indices_to_delete]
+
+plot(swipe[swipe$user_id == id,]$action_number)
+
+
+id <- 8
+
+swipe[swipe$user_id == id]$diff_time <-
+  c(0, diff(swipe[swipe$user_id == id,]$uptime))
+
+max_diff_time <- max(swipe$diff_time)
+
+indices <- which(swipe$user_id == id)
+id_last <- which(swipe$user_id == id & 
+                   swipe$diff_time == max_diff_time)
+
+indices_to_delete <- c((id_last + 1): max(indices))
+swipe <- swipe[-indices_to_delete]
+
+plot(swipe[swipe$user_id == id,]$action_number)
+
+
+
+##################
+# Fix [error II] #
+##################
+
+SWIPE_PIX_SEND <- 2
+for (id in ids_error1){
+  
+  id_indices <- which(swipe$user_id == id &
+                        swipe$action_number < 3)
+  
+  first_index_pix <- match(c(SWIPE_PIX_SEND), 
+                           swipe[id_indices]$app_action)
+  
+  user = swipe[id_indices]
+  i = first_index_pix
+  while (user$app_action[i] == SWIPE_PIX_SEND) {
+    i <- i+1
+  }
+  start_indice <- id_indices[1]
+  end_indice <- id_indices[i - 1]   
+  swipe[start_indice:end_indice]$action_number <-1
+}
+
+
+
+
+####################
+# [error III]
+# case user_id == 2
+# user logged off
+####################
+
+SWIPE_HOME <- 0
+SWIPE_HOME_BUTTON <- 1
+SWIPE_PIX_SEND <- 2 
+SWIPE_PIX_SEND_BUTTON <- 3
+SWIPE_PIX_RECEIVE_BUTTON <- 4
+
+unique(swipe$app_action)
+
+swipe_AUTH <- 6
+
+id_indices <- which(swipe$user_id == 2 &
+                      swipe$action_number < 3)
+
+first_index_pix <- match(c(SWIPE_PIX_SEND),
+                          swipe[id_indices]$app_action)
+
+user = swipe[id_indices]
+i <- first_index_pix
+while (user$app_action[i] == SWIPE_PIX_SEND) {
+  i <- i+1
+}
+
+start_indice <- id_indices[1]
+end_indice <- id_indices[i - 1]   
+swipe[start_indice:end_indice]$action_number <-0
+
+id_indices <- which(swipe$user_id == 2 &
+                      swipe$action_number == 2)
+
+
+# fix first action_number 1
+first_index_pix <- match(c(SWIPE_PIX_SEND),
+                          swipe[id_indices]$app_action)
+
+user = swipe[id_indices]
+i <- first_index_pix
+while (user$app_action[i] == SWIPE_PIX_SEND) {
+  i <- i+1
+}
+
+start_indice <- id_indices[1]
+end_indice <- id_indices[i - 1]   
+swipe[start_indice:end_indice]$action_number <-1
+
+
+
+############################
+# [error IV]
+# case user_id == 11
+# action_number starts w/ 3
+############################
+
+
+id <- 11
+
+indices_error4 <- which(swipe$user_id == id)
+user <- swipe[indices_error4]
+id_action2 <- match(c(2), user$action_number)
+
+start_indice <- indices_error4[1]
+end_indice <- indices_error4[id_action2] -1
+
+swipe[start_indice:(end_indice)]$action_number <- 1
+
+plot(swipe[swipe$user_id == 11,]$action_number)
+
+
+
+###############
+### SENSORS ###
+###############
+
+
+
+file = 'sensorsData.csv'  
+path_csv = paste(path_parent,file, sep = '')
+sensors  = fread(path_csv)
+cnames <- c('user_id', 'action_number', 'app_action', 
+            'sensor_type', 'x', 'y', 'z', 'timestamp')  
+names(sensors) <- cnames
+sensors$timestamp <- sensors$timestamp / 1000000 # nano to milliseconds
+
+# nearly accurate
+# stop keyboard data when new screen comes
+SWIPE_HOME <- 0
+SWIPE_HOME_BUTTON <- 1
+SWIPE_PIX_SEND <- 2 
+SWIPE_PIX_SEND_BUTTON <- 3
+SWIPE_PIX_RECEIVE_BUTTON <- 4
+KEYBOARD_LOGIN <- 5
+KEYBOARD_AUTH <- 6
+KEYBOARD_PIX_MONEY <- 7
+KEYBOARD_PIX_CPF <- 8
+
+ids <- unique(sensors[sensors$action_number == 7,]$user_id)
+ids_error1 <- ids[ids !=11 & ids !=2]
+
+table(sensors$app_action)
+View(sensors[sensors$user_id == 12,])
+plot(sensors[sensors$user_id == 12,]$action_number)
+
+# (0)     unnecessary data
+# (I)     7, 8 twice
+# (II)    all started w/ 2
+# (III)   2 logged out
+# (IV)    11 started w/ 3
+
+# [error 0]
+
+
+user_indices <- which(sensors$user_id == 2)
+#user_sensor <- sensors[user_indices]
+
+# correct order: 7, 8, 6
+
+user <- sensors[sensors$user_id == ids_error1[1]]
+setorder(user, cols= 'timestamp')
+
+View(user)
+
+user$delete <- F
+indices_to_delete <- c()
+
+is_keyboards <- F
+previous_action_number <- 0
+previous_app_action <- -1
+has_keyboard_cpf <- 0
+has_keyboard_auth <- 0
+
+for (i in c(1:nrow(user))){
+  
+  row <- user[i]
+  app_action <- row$app_action
+  action_number <- row$action_number
+  
+  if(app_action == KEYBOARD_LOGIN ||
+     app_action == SWIPE_HOME ||
+     app_action == SWIPE_HOME_BUTTON ||
+     app_action == SWIPE_PIX_SEND ||
+     app_action == SWIPE_PIX_SEND_BUTTON ||
+     app_action == SWIPE_PIX_RECEIVE_BUTTON ||
+     action_number != previous_action_number)
+  {
+    is_keyboards <- F
+    has_keyboard_cpf <- F
+    has_keyboard_auth <- F
+  } else{
+    # last possible action not keyboards.
+    # keyboards restarts here
+    if((previous_app_action == SWIPE_PIX_SEND ||
+       previous_app_action == SWIPE_PIX_SEND_BUTTON) &&
+       (app_action == KEYBOARD_PIX_MONEY)){
+        is_keyboards <- T
+    }
+  }
+  
+  
+  # between no critical keyboard data
+  if(is_keyboards == F){
+    if(app_action == KEYBOARD_PIX_MONEY ||
+       app_action == KEYBOARD_AUTH ||
+       app_action == KEYBOARD_PIX_CPF){
+        indices_to_delete <- append(indices_to_delete, i)
+        user$delete[i] <- T
+      }
+  } else {
+    
+    # between keyboards
+    if(has_keyboard_cpf == T)
+    {
+      if (app_action == KEYBOARD_PIX_MONEY){
+        indices_to_delete <- append(indices_to_delete, i)
+        user$delete[i] <- T
+      }
+    }
+    if(has_keyboard_auth == T){
+      if (app_action == KEYBOARD_PIX_MONEY ||
+          app_action == KEYBOARD_PIX_CPF){
+        indices_to_delete <- append(indices_to_delete, i)
+        user$delete[i] <- T
+      }
+    }
+  }
+  
+  if(app_action == KEYBOARD_PIX_CPF){
+    is_keyboards <- T
+    has_keyboard_cpf =  T
+  }
+  if(app_action == KEYBOARD_AUTH){
+    is_keyboards <- T
+    has_keyboard_auth =  T
+  }
+  previous_app_action <- app_action
+  previous_action_number <- action_number 
+  
+}
+
+user <- user[-indices_to_delete]
+View(user)
+
+
+
+
+
+
+
+
+
+
+
+
+
+# 
+# # clear pix_money   
+# if(current_action == KEYBOARD_LOGIN ||
+#    current_action == SWIPE_HOME ||
+#    current_action == SWIPE_PIX_SEND
+# ){
+#   correct_action <- current_action
+# }
+# else if(current_action == KEYBOARD_AUTH){
+#   
+# }
+# else if(current_action == KEYBOARD_PIX_CPF){
+#   #print('KEYBOARD_PIX_CPF')
+#   if(correct_action == KEYBOARD_AUTH){
+#     indices_to_delete <- append(indices_to_delete, i)
+#   }
+#   else{
+#     correct_action <- current_action
+#   }
+# }
+# else if(current_action == KEYBOARD_PIX_MONEY){
+#   #print('KEYBOARD_PIX_MONEY')
+#   if(correct_action == KEYBOARD_AUTH ||
+#      correct_action == KEYBOARD_PIX_CPF){
+#     indices_to_delete <- append(indices_to_delete, i)
+#   }
+#   else{
+#     correct_action <- current_action
+#   }
+# }
+
+# Fix [error 1]
+
+# for a id
+
+test_indices <- which(sensors$user_id == 2 &
+                        sensors$app_action == SWIPE_HOME)
+first_keyboard_indice <- match(
+  c(KEYBOARD_PIX_MONEY), 
+  sensors[test_indices]$app_action
+)
+# first keyboard row
+sensors[test_indices][first_keyboard_indice]
+
+
+
+
+test_sensors <- sensors[test_indices]
+test_sensors$tsdiff <- c(0, diff(test_sensors$timestamp))
+indices_action <- which(test_sensors$tsdiff > 10000)
+
+
+
+# [error 3] don't turn off others sensors 
+
+
+
+
+
+SWIPE_PIX_SEND <- 2
+for (id in ids_error1){
+  
+  id_indices <- which(sensors$user_id == id &
+                        sensors$action_number < 3)
+  
+  first_index_pix <- match(c(SWIPE_PIX_SEND), 
+                           sensors[id_indices]$app_action)
+  
+  user = sensors[id_indices]
+  i = first_index_pix
+  while (user$app_action[i] == SWIPE_PIX_SEND) {
+    i <- i+1
+  }
+  start_indice <- id_indices[1]
+  end_indice <- id_indices[i - 1]   
+  sensors[start_indice:end_indice]$action_number <-1
+}
+
+
+
+
+# sensors[order(
+#   sensors$user_id, 
+#   sensors$action_number, 
+#   sensors$app_action),]
+
+# base <- sensors %>%
+#   group_by(
+#     user_id, 
+#     action_number,
+#     app_action)
+# 
+# description = base %>%
+#   summarise(
+#     action_number = mean(action_number),
+#     obs = n()
+#   )
+
+
+
+
+
+
+# [error 3] sensors still work after auth
+
+
