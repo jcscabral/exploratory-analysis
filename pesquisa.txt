@@ -1,0 +1,98 @@
+============
+HAPTIC TOUCH
+============
+https://www.pocket-lint.com/pt-br/celulares/noticias/apple/149457-o-que-e-a-tecnologia-do-toque-tatil-de-macas-como-funciona-e-o-que-voce-pode-fazer-com-ela/
+
+===================
+DETECÇÃO DE EMOÇÕES
+===================
+
+> ÍRIS 
+https://www.ncbi.nlm.nih.gov/pmc/articles/PMC7219342/
+https://en.wikipedia.org/wiki/Iris_recognition
+
+> SPEECH
+https://www.kaggle.com/code/eward96/speech-emotion-detection
+
+> PESQUISA
+https://academic.oup.com/jssam/advance-article/doi/10.1093/jssam/smac036/6967120
+https://papers.ssrn.com/sol3/papers.cfm?abstract_id=4267942
+https://class.movelms.com/class?t=34358f2eedc269399116159312b9f83f
+https://www.e-consystems.com/blog/camera/technology/what-are-depth-sensing-cameras-how-do-they-work/
+file:///home/jcscabral/Downloads/TR1575.pdf
+https://www.ncbi.nlm.nih.gov/pmc/articles/PMC7219342/
+https://www.kaggle.com/code/eward96/speech-emotion-detection
+https://www.atlantis-press.com/proceedings/amcce-15/20345
+https://repositorio.ufsc.br/handle/123456789/102299
+
+
+==========
+BIOMETRICS
+==========
+
+https://link.springer.com/chapter/10.1007/978-3-030-84760-9_26
+https://link.springer.com/chapter/10.1007/978-0-387-35528-3_17
+https://data.world/uci/smartphone-dataset-for-human-activity-recognition
+https://datasetsearch.research.google.com/search?query=smartphone&docid=L2cvMTFqbnpiMnJybA%3D%3D
+https://www.emotionsense.org/
+
+KEYSTROKE DYNAMICS
+https://www.ncbi.nlm.nih.gov/pmc/articles/PMC9105156/
+https://ieeexplore.ieee.org/stamp/stamp.jsp?tp=&arnumber=8852068
+https://www.nature.com/articles/s41598-022-20099-6
+
+https://ieeexplore.ieee.org/document/6550478
+
+======
+CODING
+======
+
+* similar app:
+https://www.my-therappy.co.uk/app/t2-mood-tracker
+https://developers.google.com/location-context/activity-recognition?hl=pt-br
+* Android gestures and touch mechanics
+https://www.sitepoint.com/android-gestures-and-touch-mechanics/
+https://developer.android.com/develop/ui/views/touch-and-input/gestures/movement
+https://developer.android.com/training/gestures/viewgroup?hl=pt-br#kotlin
+https://developer.android.com/training/gestures/detector?hl=pt-br
+https://developer.android.com/training/gestures/detector?hl=pt-br#detect
+https://developer.android.com/guide/topics/sensors/sensors_overview?hl=pt-br#kotlin
+
+============
+BASED THEORY
+============
+
+SECURITY
+https://www.nytimes.com/2017/04/10/technology/fingerprint-security-smartphones-apple-google-samsung.html
+
+DATA-CENTRIC AI (X MODEL-CENTRIC AI)
+https://dcai.csail.mit.edu/
+
+EM ALGORITHM
+https://medium.com/analytics-vidhya/expectation-maximization-algorithm-step-by-step-30157192de9f
+
+=========
+APPROCHES
+=========
+
+>> Generative
+https://stats.stackexchange.com/questions/560780/why-generative-models-are-better-at-detecting-outliers
+   ODIM
+https://arxiv.org/abs/2301.04257
+
+
+>> DTM - Dynamic Time Warping
+https://link.springer.com/chapter/10.1007/978-3-540-74048-3_4#:~:text=Dynamic%20time%20warping%20(DTW)%20is,fashion%20to%20match%20each%20other.
+
+
+>> IMPROVED ISOLATION FOREST
+https://www.scirp.org/journal/paperinformation.aspx?paperid=111345
+https://github.com/sahandha/eif
+
+
+Bibliografia
+
+S. Nanavati, M. Thieme and R. Nanavati, “Biometrics Identity Verification in a Networked World,” John Wiley & Sons, Inc., New York, 2002.
+
+
+
