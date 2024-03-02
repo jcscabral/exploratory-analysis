@@ -39,6 +39,7 @@ keyboard_data_20240119 <- function(){
   names(keyboard) <- cnames
   
   ids <- unique(keyboard[keyboard$action_number == 7,]$user_id)
+  keyboard <- keyboard %>% filter(user_id %in% ids)
   ids_error1 <- ids[ids !=11 & ids !=2]
   
   

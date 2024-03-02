@@ -37,9 +37,8 @@ keyboard_data_20240122_20 <- function(){
   names(keyboard) <- cnames
   
   ids <- unique(keyboard[keyboard$action_number == 7,]$user_id)
+  keyboard <- keyboard %>% filter(user_id %in% ids)
   ids_error1 <- ids[ids != 19 & ids != 20 & ids != 25]
-  
-  
   
   #############
   # [error I] #
@@ -49,14 +48,15 @@ keyboard_data_20240122_20 <- function(){
   
   for (id in ids_error1){
     
-    id_indices <- which(keyboard$user_id == id &
-                          keyboard$action_number < 3)
+    id_indices <- which((keyboard$user_id == id) &
+                          (keyboard$action_number < 3))
     
     # first auth
     first_index_auth <- match(c(KEYBOARD_AUTH), 
                               keyboard[id_indices]$app_action)
     
     user <- keyboard[id_indices]
+    
     i <- first_index_auth
     while (user$app_action[i] == KEYBOARD_AUTH) {
       i <- i+1

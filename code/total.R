@@ -17,7 +17,7 @@ sensors_file <- 'sensorsData.csv'
 
 path_parent <- '/home/jcscabral/Studies/UspEsalq/Tcc/projeto/pesquisa/datasets/'
 
-files <- c('20240123', '20240124', '20240125', '20240126')
+files <- c('20240123', '20240124', '20240125', '20240126', '20240228')
 
 
 ############
@@ -40,6 +40,10 @@ for(file in files){
   ids_completed <- unique(keyboard[keyboard$action_number == 7]$user_id)
   keyboard.completed <- keyboard %>% filter(user_id %in% ids_completed)
   
+  # it started with user_id == 51
+  if (file == '20240228'){
+    keyboard[keyboard$user_id>50]
+  }
   if(is.null(keyboard.total)){
     keyboard.total <- keyboard.completed
   }
@@ -52,7 +56,6 @@ keyboard <- NULL
 keyboard.completed <- NULL
 
 ids_completed <- unique(keyboard.total$user_id)
-length(ids_completed)
 
 keyboard <- keyboard.total %>% filter(user_id %in% ids_completed)
 keyboard.total =  NULL
@@ -133,12 +136,11 @@ for (id in ids_completed){
 # Geometric Mean (gm), Median (md), Range (rg), Variance
 # (vr), Standard Deviation (sd), Skewness (sk), Kurtosis (ku),
 # First Quartile (fq), Third Quartile (tq), Interquartile Range
-# (ir), Mean Absolute Deviation (ma), Median Absolute Devi-
-#   ation (mi), Coefficient of Variation (cv), and Standard Error
-# of Mean (se).
+# (ir), Mean Absolute Deviation (ma), Median Absolute Deviation (mi),
+# Coefficient of Variation (cv), and Standard Error of Mean (se).
 # --------------------------------------------------------------
 
-# more ... TODO
+# more variables ... TODO
 # first, last
 # ------------
 
@@ -1205,7 +1207,9 @@ desc_login_characters$character.x <- NULL
 desc_login_characters$character.y <- NULL
 
 
-# Feature Extraction
+######################
+# Feature Extraction #
+######################
 
 colSums(is.na(desc_login_characters))
 cols.na <-names(
@@ -1232,7 +1236,7 @@ chart.Correlation(card_chars[32:nrow(card_chars)])
 # Information Gain Attribute Evaluator (IGAE) Weka
 
 card_chars$id <- as.character(card_chars$user_id)
-write_csv(card_chars[c(591, c(2:590))], 'card_keyboard.csv')
+write_csv(card_chars[c(ncol(card_chars), c(2:590))], 'card_keyboard.csv')
 
 # Ranked attributes by Weka InfoGainAttributeVal:
 
@@ -1275,8 +1279,9 @@ rf <- randomForest(x_train, y_train, ntree = 10)
 results <- predict(object = rf, x_test, type ="prob")
 results
 
+apply(results, 1, max, na.rm=TRUE) # max by row
 
-
+nrow(train)
 
 
 
