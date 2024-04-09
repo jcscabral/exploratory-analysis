@@ -1,3 +1,4 @@
+USE_SENSOR_DATA <-T
 
 #########
 # SWIPE #
@@ -8,7 +9,7 @@
 # functions #
 #############
 
-cardStats <- function(dfdata){
+swipeStats <- function(dfdata){
   
   desc_action <- dfdata %>%
     mutate(
@@ -332,6 +333,25 @@ cardStats <- function(dfdata){
   return(desc_action)
 }
 
+getSwipeStats <- function(dswipe){
+  
+  # group by user, action number, swipe number
+  base <- dswipe %>%
+    group_by(user_id, action_number, swipe_number)
+  
+  stats <- swipeStats(base)
+  # remove inf and na
+  stats[is.na(stats)] <- 0
+  stats[sapply(stats, is.infinite)] <- 0
+  # mean 
+  stats <- stats %>% 
+    group_by(user_id) %>%
+    summarise_all("mean")
+  # discard swipe-number
+  return(stats[-c(2, 3)])
+}
+
+
 pcaData <- function(dcard){
   # principal lib #
   # fatorial <- principal(dcard,
@@ -366,39 +386,28 @@ pcaData <- function(dcard){
   return(data.pca)
   
 }
-
-getCardSection <- function(swipe_user){
-  # group by user, action number, swipe number
-  base <- swipe_user %>%
-    group_by(user_id, action_number, swipe_number)
-  card <- cardStats(base)
-  # remove inf and na
-  card[is.na(card)] <- 0
-  card[sapply(card, is.infinite)] <- 0
-  return(card)
-}
-
+# scaled
 getCard <- function(swipe_user){
   
-  # standard only numerical data (m=0, s =1)
   swipe_user.scaled <- swipe_user %>% 
     select(c(6:18)) %>% scale
   swipe_user.scaled <- bind_cols(swipe_user.scaled, 
                                  swipe_user[,c(1:5)])
   swipe_user.scaled <- swipe_user.scaled[,c(c(14:18), c(1:13))]
   
+  
   # group by user and swipe number
   base <- swipe_user.scaled %>%
     group_by(user_id, swipe_number)
-  card.user <- cardStats(base)
+  card.test <- swipeStats(base)
   # remove inf and na
-  card.user[is.na(card.user)] <- 0
-  card.user[sapply(card.user, is.infinite)] <- 0
-  #return(card.user)
+  card.test[is.na(card.test)] <- 0
+  card.test[sapply(card.test, is.infinite)] <- 0
+  #return(card.test)
   
   # remove categorical data
   # TODO comment
-  card <- card.user[,-c(1,2)]
+  card <- card.test[,-c(1,2)]
   
   # cols.not.zero <-names(
   #   which(colSums(card) > 0)
@@ -408,6 +417,82 @@ getCard <- function(swipe_user){
   return(card)
   
 }
+# w/ variable's selection
+getCardTemplate <- function(dbase, cols.ranked = NULL ){
+  
+  threshold <- length(ids_completed)/ (ncol(dbase) - 1)
+  
+  if (is.null(cols.ranked)){
+    cols.not.na <-names(
+      which(colSums(is.na(dbase)) == 0)
+    )
+    card_swipe <- dbase[cols.not.na]
+    
+    result <- FSelectorRcpp::information_gain(
+      formula = user_id ~ .,
+      data = card_swipe ,
+      type = 'infogain'
+    )
+    cols_ranked  <- result %>% 
+      filter(importance >= threshold) %>% select(attributes)
+    cols_ranked <- c("user_id", as_vector(cols_ranked))
+    
+  }
+  else{
+    cols_ranked <- cols.ranked
+    card_swipe <- dbase[cols_ranked]
+    card_swipe[is.na(card_swipe)] <- 0.0
+  }
+  
+  card_swipe_ranked <- card_swipe[cols_ranked]
+  results <- list("cols" = cols_ranked, "card" = card_swipe_ranked)
+  return(results)
+  
+}
+
+
+loadSwipe <- function(loadFixed = T){
+  swipe.total = NULL
+  
+  for(file in FILES_B){
+    
+    path_day <- paste(PATH_PARENT, file, '/', sep = '')
+    
+    # SWIPE #
+    full_path <- paste(path_day, SWIPE_FILE, sep = '')
+    swipe <- fread(full_path)
+    cnames <- c('user_id', 'action_number', 'app_action', 'pointer_event_type', 
+                'pressure', 'x', 'y', 'uptime')  
+    names(swipe) <- cnames
+    
+    ids_completed <- unique(swipe[swipe$action_number == 7]$user_id)
+    swipe.completed <- swipe %>% filter(user_id %in% ids_completed)
+    
+    if(is.null(swipe.total)){
+      swipe.total <- swipe.completed
+    }
+    else{
+      swipe.total <-rbind(swipe.total, swipe.completed)
+    }
+  }
+  
+  swipe <- NULL
+  swipe.completed <- NULL
+  
+  ids_completed <- unique(swipe.total$user_id)
+  length(ids_completed)
+  
+  swipe <- swipe.total
+  swipe.total =  NULL
+  
+  if(loadFixed == T){
+    swipe <- rbind(swipe, swipe_data_20240119())
+    swipe <- rbind(swipe, swipe_data_20240122_20())
+  }
+  
+  return(swipe)
+  
+}
 
 
 
@@ -415,54 +500,19 @@ getCard <- function(swipe_user){
 # load data #
 #############
 
-# files A and B  ###############
-
-swipe.total = NULL
-
-for(file in FILES_B){
-  
-  path_day <- paste(PATH_PARENT, file, '/', sep = '')
-  
-  # SWIPE #
-  full_path <- paste(path_day, SWIPE_FILE, sep = '')
-  swipe <- fread(full_path)
-  cnames <- c('user_id', 'action_number', 'app_action', 'pointer_event_type', 
-              'pressure', 'x', 'y', 'uptime')  
-  names(swipe) <- cnames
-  
-  ids_completed <- unique(swipe[swipe$action_number == 7]$user_id)
-  swipe.completed <- swipe %>% filter(user_id %in% ids_completed)
-  
-  if(is.null(swipe.total)){
-    swipe.total <- swipe.completed
-  }
-  else{
-    swipe.total <-rbind(swipe.total, swipe.completed)
-  }
-}
-
-swipe <- NULL
-swipe.completed <- NULL
-
-ids_completed <- unique(swipe.total$user_id)
-length(ids_completed)
-
-swipe <- swipe.total
-swipe.total =  NULL
-
-swipe <- rbind(swipe, swipe_data_20240119())
-swipe <- rbind(swipe, swipe_data_20240122_20())
-
+swipe <- loadSwipe(F)
 ids_completed <- unique(swipe$user_id)
 length(ids_completed)
-  
+
+if (USE_SENSOR_DATA == T){
+  sensors.swipe <- loadSensorsSwipe()
+}
 
 
 #################
 # new variables #
 #################
 
-# new variables ###############
 swipe$swipe_number <- 0
 swipe$time_diff <- 0
 swipe$press_time_diff <- 0
@@ -473,7 +523,9 @@ swipe$velocity_x <- 0.0
 swipe$velocity_y <- 0.0
 swipe$acceleration_x <- 0.0
 swipe$acceleration_y <- 0.0
+
 # rearrange columns #
+#length(names(swipe))
 swipe <- swipe[,c(1,2,3,4,9,5,6,7,8,10,11,12,13,14,15,16,17,18)]
 
 # inserts ###############
@@ -538,15 +590,390 @@ for (id in ids_completed){
   }
 }
 
-# split train and test #
 
-set.seed(42)
+
+############
+# TRAINING #
+############
+
+
+##################
+#   supervised   #
+# Random Forrest #
+##################
+
+NUM_SESSIONS <- 5
+
+# II - split data: test with only real unknown intruder 
+
 ids <- sample(ids_completed)
 
-# TODO supervisied classifier
-# ind <- round(length(ids) * 0.90)
-# ids.train <-ids[1:ind]
-# ids.test <-ids[(ind+1):length(ids)]
+PC_30 <- 0.3
+PC_50 <- 0.5
+PC_70 <- 0.7
+PC_90 <- 0.9
+percents <-c(PC_30, PC_50, PC_70, PC_90) 
+
+df.results <- data.frame(
+  pc_train = double(),
+  iter = integer(),
+  num_users = integer(),
+  num_attackers = integer(),
+  num_variables = integer(),
+  user_pos = integer(),
+  user_neg = integer(),
+  user_acc = double(),
+  attack_pos = integer(),
+  attack_neg = integer(),
+  attack_acc = double(),
+  grd_user_pos = integer(),
+  grd_user_neg = integer(),
+  grd_user_acc = double(),
+  grd_attack_pos = integer(),
+  grd_attack_neg = integer(),
+  grd_attack_acc = double()
+)
+
+grd_user_pos <- 0
+grd_user_neg <- 0
+grd_user_acc <- 0
+grd_attack_pos <- 0
+grd_attack_neg <- 0
+grd_attack_acc <- 0
+
+iters <- c(0,1)
+row <- 1
+for (pc_train in percents){
+  
+  # iter
+  # 0: train/test:[1-5], val:6 
+  # 1: train/test:[1-5], val:7
+  for (iter in iters){
+    
+    # I-  split users and attackers 
+    
+    session_start <- 1 + iter
+    session_end <- NUM_SESSIONS + iter
+    
+    ind <- round(length(ids) * pc_train)
+    ids.train <-ids[1:ind]
+    ids.val <-ids[(ind+1):length(ids)]
+    
+    num_users <- length(ids.train)
+    num_attackers <- length(ids.val)
+    
+    # II- template creation (training)
+    
+    swipe.train <- swipe %>% 
+      filter(user_id %in% ids.train)
+    
+    if (USE_SENSOR_DATA == T){
+      # sensor data
+      sensors.train <- sensors.swipe  %>% 
+        filter(user_id %in% ids.train)
+    }
+    
+    swipe.train.template <- swipe.train %>%
+      filter(action_number >= session_start,
+             action_number <= session_end)
+    
+    swipe.train.stats <- getSwipeStats(swipe.train.template)
+    
+    if (USE_SENSOR_DATA == T){
+      sensors.train.grouped <- sensors.train %>%  
+        filter(action_number >= session_start,
+               action_number <= session_end) %>%
+        group_by(user_id)
+      
+      sensors.stats <- sensorStats(sensors.train.grouped)
+      swipe.train.stats <- bind_cols(swipe.train.stats, 
+                               sensors.stats[c(3:ncol(sensors.stats))])
+      
+    }
+    
+    results.template <- getCardTemplate(swipe.train.stats)
+    card.train <- results.template$card
+    
+    num_variables <- ncol(card.train) -1
+    
+    # III - user test
+    
+    swipe.test <- swipe.train %>%
+      filter(action_number == session_end + 1) #%>%
+      #group_by(user_id, action_number)
+    swipe.test.stats <- getSwipeStats(swipe.test)
+    
+    if (USE_SENSOR_DATA == T){
+      sensor.user.grouped <- sensors.train %>%
+        filter(action_number == session_end + 1) %>%
+        group_by(user_id)
+      
+      sensors.user.stats <- sensorStats(sensor.user.grouped)
+      swipe.test.stats <- bind_cols(swipe.test.stats, 
+          sensors.user.stats[c(3:ncol(sensors.user.stats))])
+    }
+    
+    results.user <- getCardTemplate(swipe.test.stats, results.template$cols)
+    card.test <- results.user$card
+    
+    # IV - validation
+    
+    swipe.val <- swipe %>% 
+      filter(user_id %in% ids.val)
+    
+    if (USE_SENSOR_DATA == T){
+      sensors.val <- sensors.swipe %>% #sensors.user %>% 
+        filter(user_id %in% ids.val)
+    }
+    
+    #swipe.val.grouped <- swipe.val #%>%
+      #group_by(user_id, action_number)
+    
+    swipe.val.stats <- getSwipeStats(swipe.val)
+    
+    if (USE_SENSOR_DATA == T){
+      sensor.val.grouped <- sensors.val %>%
+        group_by(user_id)
+      
+      sensors.val.stats <- sensorStats(sensor.val.grouped)
+      swipe.val.stats <- bind_cols(swipe.val.stats, 
+            sensors.val.stats[c(3:ncol(sensors.val.stats))])
+      
+    }
+    
+    results.val <- getCardTemplate(swipe.val.stats, results.template$cols)
+    card.val <- results.val$card
+    
+    
+    
+    # TRAIN #####
+    
+    x_train <- card.train[,-1]
+    y_train <- as.factor(card.train$user_id)
+    
+    x_test <- card.test[,-1]
+    y_test <- as.factor(card.test$user_id)
+    
+    x_val <- card.val[,-1]
+    y_val <- as.factor(card.val$user_id)
+    
+    
+    # pure randomForest
+    rf <- randomForest(x_train, y_train)
+
+    # rf with gridsearch k-fold
+    df.train <- card.train
+    df.train$user_id <- paste("u", df.train$user_id, sep = "")
+    control <- trainControl(method = "repeatedcv",
+                            number = 10 ,
+                            repeats = 2,
+                            search = "grid",
+                            classProbs = T)
+    
+    # gridsearch <- train(
+    #   x = df.train[-c(1)],
+    #   y  = df.train$user_id ,
+    #   method = 'rf',
+    #   ntree = 100,
+    #   trControl = control
+    # )
+
+    ###pred.class.user == y_test
+    
+    
+    # I. user try
+    #pred.prob.user <- predict(object = rf, x_test, type ="prob")
+    pred.class.user <- predict(object = rf, x_test, type ="class")
+    user_pos <- sum(pred.class.user == y_test)
+    user_neg <- sum(pred.class.user != y_test)
+    user_acc <- user_pos/length(pred.class.user)
+
+    # II. attack try
+    #pred.prob.val <- predict(object = rf, x_val, type ="prob")
+    pred.class.val <- predict(object = rf, x_val, type ="class")
+    attack_pos <- sum(as.character(pred.class.val) == as.character(y_val))
+    attack_neg <- sum(as.character(pred.class.val) != as.character(y_val))
+    attack_acc <- attack_pos/length(pred.class.val)
+
+
+    # II. gridsearch
+
+    # df.user.y <- paste("u", y_test, sep = "")
+    # 
+    # pred.prob.kfold <- predict(gridsearch, x_test, type = 'prob')
+    # pred.class.kfold <- predict(gridsearch, x_test)
+    # grd_user_pos <- sum(pred.class.kfold == df.user.y)
+    # grd_user_neg <- sum(pred.class.kfold != df.user.y)
+    # grd_user_acc <- grd_user_pos / length(df.user.y)
+    # 
+    # df.val.y <- paste("u", y_val, sep = "")
+    # 
+    # pred.prob.attack.kfold <- predict(gridsearch, x_val, type = 'prob')
+    # pred.class.attack.kfold <- predict(gridsearch, x_val)
+    # 
+    # grd_attack_pos <- sum(pred.class.attack.kfold == df.val.y)
+    # grd_attack_neg <- sum(pred.class.attack.kfold != df.val.y)
+    # grd_attack_acc <- grd_attack_pos/length(df.val.y)
+
+    df.results[row,] <- c(pc_train, iter, num_users,
+                          num_attackers,
+                          num_variables,
+                          user_pos,
+                          user_neg,
+                          user_acc,
+                          attack_pos,
+                          attack_neg,
+                          attack_acc,
+                          grd_user_pos,
+                          grd_user_neg,
+                          grd_user_acc,
+                          grd_attack_pos,
+                          grd_attack_neg,
+                          grd_attack_acc
+    )
+    row <- row + 1
+  }
+}
+
+df.results.no.sens <- df.results
+write_csv(df.results, 'result52-no-sens')
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+##################
+#  unsupervised  #
+# SVM one Class  #
+##################
+
+# I. user's user try #######################
+# using 5 sections to build a model 
+
+# POC ##
+id <- 71
+swipe.user <- swipe[swipe$user_id == id,]
+swipe.user.train <- swipe.user %>%
+  filter(action_number == 3)
+
+card <- getCard(swipe.user.train)
+pca.user <- pcaData(card)
+
+#user.model <- tune.svm(
+#  pca.user$x, y = NULL
+#)
+c(1:5)
+nus <- c(1: 100)/100
+
+user.model <- svm(scale(pca.user$x), 
+                  y = NULL,
+                  type = 'one-classification',
+                  kernel = 'radial',
+                  nu = 0.1,
+                  gamma = 1.0e-7,
+                  scale = T
+)
+
+test.result <- predict(user.model, pca.user$x)
+
+
+
+
+
+
+swipe.user.test <- swipe.user[
+  swipe.user$action_number == 3]
+card.test <- getCard(swipe.user.test)
+project.test <- predict(pca.user, card.test)
+
+test.result <- predict(user.model, project.test)
+
+# end #####
+
+# try gridsearch
+
+
+#######################
+
+results.self <- data.frame(
+  section = integer(),
+  id = integer(),
+  acc = double()
+)
+
+row <- 1
+sections.model <- 5
+for (id in ids){
+  
+  swipe.user <- swipe[swipe$user_id == id,]
+  for (s in c(1:2)){
+    
+    swipe.user.train <- swipe.user %>%
+      filter(action_number > (s -1),
+             action_number < (sections.model + s))
+    
+    card <- getCard(swipe.user.train)
+    pca.user <- pcaData(card)
+    
+    #View(pca.user$x)
+    #View(pca.user$rotation)
+    #summary(pca.user)
+    
+    # build the model
+    # SVM
+    user.model <- svm(pca.user$x, y = NULL, 
+                      type = 'one-classification',
+                      kernel = 'radial',
+                      nu = 0.1,
+                      gamma = 1.0e-7,
+                      scale = T
+    )
+    
+    swipe.user.test <- swipe.user[
+      swipe.user$action_number == (sections.model + s)]
+    card.test <- getCard(swipe.user.test)
+    project.test <- predict(pca.user, card.test)
+    
+    # View(project.test)
+    # summary(project.test)
+    
+    
+    # classifier
+    test.result <- predict(user.model, project.test)
+    
+    acc <- mean(test.result)
+    section <- sections.model + s
+    row.value <- c(section, id, acc)
+    results.self[row,] <- row.value
+    row <- row + 1
+  }
+}  
+
+
+nrow(results.self[results.self$acc>= 0.5,])/ 
+  nrow(results.self)
+
+# param | svm                | acc
+# -------------------------------------
+# 1     | kernel = radial   | 0.25
+# 1     | gamma = 10^-7     | 0.3461538
+# 2     | gamma = 10^-7     | 0.125
+# 2     | kernel = 'radial' | 0.1538462
+#       | nu = 0.10,     
+#       | scale= T
+#       | scale = T
+# 2     | gamma = 1.0e-7    | 0.1634615
+# horrible!!! SVM is wrong here
 
 
 #####################
@@ -564,11 +991,12 @@ ids <- sample(ids_completed)
 # swipe.user <- swipe[swipe$user_id == id]
 # card <- getCard(swipe.user)
 # pca.user <- pcaData(card)
-
-# user.model <- svm(pca.user$x, y = NULL, 
-#                   type = 'one-classification',
-#                   #nu = 0.10,
-#                   kernel = 'radial') 
+# pca.user$x
+# 
+# user.model <- svm(pca.user$x, y = NULL,
+#                    type = 'one-classification',
+#                    nu = 0.10,
+#                    kernel = 'radial')
 
 # df.results <- data.frame(
 #   id = integer(),
@@ -656,89 +1084,19 @@ write.csv(results.section, 'section_results.csv')
 
 
 
-# III. user accuracy by section #######################
-# using 5 sections to build a model 
-
-results.self <- data.frame(
-  section = integer(),
-  id = integer(),
-  acc = double()
-)
-
-row <- 1
-sections.model <- 5
-for (id in ids){
-  
-  swipe.user <- swipe[swipe$user_id == id,]
-  for (s in c(1:2)){
-    
-    swipe.user.train <- swipe.user %>%
-      filter(action_number > (s -1),
-             action_number < (sections.model + s))
-    
-    card <- getCard(swipe.user.train)
-    pca.user <- pcaData(card)
-    
-    #View(pca.user$x)
-    #View(pca.user$rotation)
-    #summary(pca.user)
-    
-    swipe.user.test <- swipe.user[
-      swipe.user$action_number == (sections.model + s) ]
-    card.test <- getCard(swipe.user.test)
-    project.test <- predict(pca.user, card.test)
-    
-    # View(project.test)
-    #summary(project.test)
-    
-    # SVM
-    user.model <- svm(pca.user$x, y = NULL, 
-                      type = 'one-classification',
-                      kernel = 'radial',
-                      nu = 0.1,
-                      gamma = 1.0e-7,
-                      scale = T
-                      )
-    
-    # classifier
-    test.result <- predict(user.model, project.test)
-    
-    acc <- mean(test.result)
-    section <- sections.model + s
-    row.value <- c(section, id, acc)
-    results.self[row,] <- row.value
-    row <- row + 1
-  }
-}  
-
-
-nrow(results.self[results.self$acc>= 0.5,])/ 
-  nrow(results.self)
-
-# param | svm                | acc
-# -------------------------------------
-# 1     | kernel = radial   | 0.25
-# 1     | gamma = 10^-7     | 0.3461538
-# 2     | gamma = 10^-7     | 0.125
-# 2     | kernel = 'radial' | 0.1538462
-#       | nu = 0.10,     
-#       | scale= T
-#       | scale = T
-# 2     | gamma = 1.0e-7    | 0.1634615
-# horrible!!! SVM is wrong here
 
 
 
+#############################
+# Export data ###############
+#############################
 
-
-
-# Export data #######################
 # implement in scikit-learn
 
 path.cards =  './swipecards/'
 for (id in ids){
   swipe.user <- swipe[swipe$user_id == id,]
-  card <- getCardSection(swipe.user)
+  card <- getSwipeStats(swipe.user)
   name.file <- paste('card', id, sep = '')
   name.file <- paste(name.file, '.csv', sep = '')
   path.file <- paste(path.cards, name.file, sep = '')
@@ -788,19 +1146,19 @@ base <- swipe %>%
 # named as a card
 # card <- desc_action[cols.not.na]
 
-desc_action <- cardStats(base)
+desc_action <- swipeStats(base)
 user <- desc_action[(desc_action$user_id == ids_completed[1]),]
-card.user <- user[,c(3:ncol(user))]
-card.user[sapply(card.user, is.infinite)] <- NA
-card.user[sapply(card.user, is.na)] <- 0
+card.test <- user[,c(3:ncol(user))]
+card.test[sapply(card.test, is.infinite)] <- NA
+card.test[sapply(card.test, is.na)] <- 0
 
 cols.not.na <-names(
-  which(colSums(is.na(card.user)) == 0)
+  which(colSums(is.na(card.test)) == 0)
 )
-cols.zero <- which(colSums(card.user) == 0)
+cols.zero <- which(colSums(card.test) == 0)
 
-card <- card.user[cols.not.na]
-card <- card.user[-cols.zero]
+card <- card.test[cols.not.na]
+card <- card.test[-cols.zero]
 
 
 cor.matrix <- cor(card)

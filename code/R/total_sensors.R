@@ -56,6 +56,14 @@ loadSensorsLogin <- function(){
   return(sensors.login)
 }
 
+loadSensorsSwipe <- function(){
+  sensors.swipe <- loadSensors() %>% filter(
+    app_action %in% c(SWIPE_HOME, SWIPE_PIX_SEND)
+    )
+  return(sensors.swipe)
+}
+
+
 ##########################################################
 # sensors.wrong$w <- sqrt((sensors.wrong$x^2) + 
 #   (sensors.wrong$y^2) + (sensors.wrong$z^2))

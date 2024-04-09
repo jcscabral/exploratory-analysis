@@ -1,13 +1,13 @@
 
 # Reference: (Buriro, 2017)
 
-USE_SENSOR_DATA <-F  
+USE_SENSOR_DATA <-T
 
 ############
 # KEYBOARD #
 ############
 
-loadKeyboard <- function(loadFixed = T) {
+loadKeyboard <- function(loadFixed = F) {
 
   # Load ####
 
@@ -27,9 +27,9 @@ loadKeyboard <- function(loadFixed = T) {
     keyboard.completed <- keyboard %>% filter(user_id %in% ids_completed)
     
     # it started with user_id == 51
-    if (file == '20240228'){
-      keyboard[keyboard$user_id>50]
-    }
+    # if (file == '20240228'){
+    #   keyboard[keyboard$user_id>50]
+    # }
     if(is.null(keyboard.total)){
       keyboard.total <- keyboard.completed
     }
@@ -40,22 +40,22 @@ loadKeyboard <- function(loadFixed = T) {
   
   keyboard <- NULL
   keyboard.completed <- NULL
-  
-  ids_completed <- unique(keyboard.total$user_id)
-  
-  keyboard <- keyboard.total %>% filter(user_id %in% ids_completed)
+
+  keyboard <- keyboard.total #%>% filter(user_id %in% ids_completed)
   keyboard.total =  NULL
   
-  if (loadFixed == T){
+  if (loadFixed == F){
     # fixed data
     keyboard <- rbind(keyboard, keyboard_data_20240119())
     keyboard <- rbind(keyboard, keyboard_data_20240122_20())
   }
   
+  ids_completed <- unique(keyboard$user_id)
+  
   # end load ####
   
   # new variables ####
-
+  
   keyboard$time_diff <- 0
   keyboard$press_time_diff <- 0
   keyboard$pressure_var <- 0.0 
@@ -120,7 +120,7 @@ loadKeyboard <- function(loadFixed = T) {
 
 }
 
-keyboard <- loadKeyboard(F)
+keyboard <- loadKeyboard(T)
 ids_completed <- sort(unique(keyboard$user_id))
 
 # plot #######
@@ -168,9 +168,7 @@ if (USE_SENSOR_DATA == T){
 
 # stats functions ####
 
-# keyboard stats
 keyboardStats <- function(dfdata, digit){
-  
   card_stats <- dfdata %>%
     filter(character == digit) %>%
     mutate(
@@ -206,7 +204,7 @@ keyboardStats <- function(dfdata, digit){
       ft_se = se(fly_time),
       ft_mn = min(fly_time , na.rm = T) ,
       ft_mx = max(fly_time, na.rm = T) ,
-      dt_qm = qm(fly_time) ,
+      ft_qm = qm(fly_time) ,
       ft_rg = rg(fly_time) ,
       ft_sk = skewness(fly_time) ,
       ft_ku = kurtosis(fly_time) ,
@@ -260,71 +258,6 @@ keyboardStats <- function(dfdata, digit){
       y_ku = kurtosis(y)
     )
   return(card_stats)
-}
-
-# sensor stats
-sensorStats <- function(dfdata){
-  
-  sensor_stats <- dfdata %>%
-    summarise(
-      # Spacial x
-      sx_md = median(x, na.rm = T),
-      sx_fq = qt(x, 1),
-      sx_tq = qt(x, 3),
-      sx_ir = IQR(x, na.rm = T),
-      sx_am = mean(x, na.rm = T),
-      sx_vr = var(x, na.rm = T),
-      sx_sd = sd(x, na.rm = T),
-      sx_cv = cv(x, na.rm = T),
-      sx_se = se(x),
-      sx_mn = min(x, na.rm = T),
-      sx_mx = max(x, na.rm = T),
-      sx_qm = qm(x),
-      sx_rg = rg(x),
-      sx_sk = skewness(x),
-      sx_ku = kurtosis(x),
-      sx_sm = sum(x),
-      
-      # Spacial y
-      sy_md = median(y, na.rm = T),
-      sy_fq = qt(y, 1),
-      sy_tq = qt(y, 3),
-      sy_ir = IQR(y, na.rm = T),
-      sy_am = mean(y, na.rm = T),
-      sy_vr = var(y),
-      sy_sd = sd(y, na.rm = T),
-      sy_cv = cv(y, na.rm = T),
-      sy_se = se(y),
-      sy_mn = min(y, na.rm = T) ,
-      sy_mx = max(y, na.rm = T) ,
-      sy_qm = qm(y),
-      sy_rg = rg(y) ,
-      sy_sk = skewness(y) ,    
-      sy_ku = kurtosis(y),
-      sy_sm = sum(y),
-      
-      # Spacial z
-      sz_md = median(z, na.rm = T),
-      sz_fq = qt(z, 1),
-      sz_tq = qt(z, 3),
-      sz_ir = IQR(z, na.rm = T),
-      sz_am = mean(z, na.rm = T),
-      sz_vr = var(z),
-      sz_sd = sd(z, na.rm = T),
-      sz_cv = cv(z, na.rm = T),
-      sz_se = se(z),
-      sz_mn = min(z, na.rm = T) ,
-      sz_mx = max(z, na.rm = T) ,
-      sz_qm = qm(z),
-      sz_rg = rg(z) ,
-      sz_sk = skewness(z) ,    
-      sz_ku = kurtosis(z),
-      sz_sm = sum(z),
-      # all vectors 
-      sdp_mg = mg3(x,y, z)
-      
-    )
-  return(sensor_stats)
 }
 
 # end card stats ####
@@ -427,553 +360,317 @@ getCharStats <- function(dbase, secao = T){
   
 }
 
-# w/ variable's selection
-getCardTemplate <- function(dbase, cols.ranked = NULL ){
+infoGainCols <- function(dbase){
+  
+  cols.not.na <- names(which(colSums(is.na(dbase)) == 0))
+  dbase <- dbase[cols.not.na]
   
   threshold <- length(ids_completed)/ (ncol(dbase) - 1)
-  
-  if (is.null(cols.ranked)){
-    cols.not.na <-names(
-      which(colSums(is.na(dbase)) == 0)
+  result <- FSelectorRcpp::information_gain(
+    formula = user_id ~ .,
+    data = dbase ,
+    type = 'infogain'
+  )
+  cols_ranked  <- result %>% 
+    filter(importance >= threshold) %>% select(attributes)
+  cols_perc  <- result %>% 
+    filter(importance >= threshold) %>% select(importance)
+  #return(as_vector(cols_ranked))
+  return(
+     list(
+      "cols_ranked" = as_vector(cols_ranked),
+      "cols_perc" = as_vector(cols_perc)
     )
-    card_chars <- dbase[cols.not.na]
-    
-    # same weka result 
-    result <- FSelectorRcpp::information_gain(
-      formula = user_id ~ .,
-      data = card_chars ,
-      type = 'infogain'
-    )
-    cols_ranked  <- result %>% 
-      filter(importance >= threshold) %>% select(attributes)
-    cols_ranked <- c("user_id", as_vector(cols_ranked))
-    
-  }
-  else{
-    cols_ranked <- cols.ranked
-    card_chars <- dbase[cols_ranked]
-    card_chars[is.na(card_chars)] <- 0.0
-  }
-  
-  card_chars_ranked <- card_chars[cols_ranked]
-  results <- list("cols" = cols_ranked, "card" = card_chars_ranked)
-  return(results)
-  
+  )
 }
 
-
 # CROSS VALIDATION #####
+
+df.results <- data.frame(
+  
+  pc_train = double(),
+  iter = integer(),
+  num_users = integer(),
+  num_attackers = integer(),
+  num_variables = integer(),
+  login_pos = integer(),
+  login_neg = integer(),
+  login_pos_prob = integer(),
+  login_neg_prob = integer(),
+  attack_pos = integer(),
+  attack_neg = integer(),
+  grd_login_pos = integer(),
+  grd_login_neg = integer(),
+  grd_login_pos_prob = integer(),
+  grd_login_neg_prob = integer(),
+  grd_attack_pos = integer(),
+  grd_attack_neg = integer()
+)
+
+df.variables <- data.frame(
+  iter = integer(),
+  no_var = character(),
+  pc_var = double()
+)
 
 
 # I. set sessions 
 
 NUM_SESSIONS <- 5
-iter <- 1
-session_start <- 1 + iter
-session_end <- NUM_SESSIONS + iter
-
 
 # II - split data: test with only real unknown intruder 
 
-set.seed(42)
 ids <- sample(ids_completed)
 
 PC_30 <- 0.3
 PC_50 <- 0.5
 PC_70 <- 0.7
 PC_90 <- 0.9
+percents <-c(PC_30, PC_50, PC_70, PC_90) 
 
-ind <- round(length(ids) * PC_90)
-ids.train <-ids[1:ind]
-ids.val <-ids[(ind+1):length(ids)]
+iters <- c(0,1)
+row <- 1
+for (pc_train in percents){
+  
+  # iter
+  # 0: train/test:[1-5], val:6 
+  # 1: train/test:[1-5], val:7
+  
+  for (iter in iters){
+    
+    # split train and attack's validation
+    session_start <- 1 + iter
+    session_end <- NUM_SESSIONS + iter
+    
+    ind <- round(length(ids) * pc_train)
+    ids.train <-ids[1:ind]
+    ids.val <-ids[(ind+1):length(ids)]
+    
+    num_users <- length(ids.train)
+    num_attackers <- length(ids.val)
+    
+    
+    ##########################
+    # I- template (training) #
+    ##########################
+    
+    keyboard.train <- keyboard_login %>% 
+      filter(user_id %in% ids.train)
+    
+    
+    if (USE_SENSOR_DATA == T){
+      sensors.train <- sensors.login  %>% 
+        filter(user_id %in% ids.train)
+    }
+    
+    keyboard.grouped <- keyboard.train %>%
+      filter(action_number >= session_start,
+             action_number <= session_end) %>%
+      group_by(user_id, character, action_number)
+    
+    keyboard.stats <- getCharStats(keyboard.grouped)
+    #info.keyboard.cols <- infoGainCols(keyboard.stats)
+    info.gaing <- infoGainCols(keyboard.stats)
+    info.keyboard.cols <- info.gaing["cols_ranked"]$cols_ranked
+    info.keyboard.perc <- info.gaing["cols_perc"]$cols_perc
+    
+    keyboard.stats <- keyboard.stats[c("user_id", info.keyboard.cols)]
+    
+    info.cols <- info.keyboard.cols
+    info.perc <- info.keyboard.perc
+    
+    info.sensor.cols = NULL
+    if (USE_SENSOR_DATA == T){
+      
+      sensors.train.grouped <- sensors.train %>%
+        filter(action_number >= session_start,
+               action_number <= session_end) %>%
+        group_by(user_id, action_number)
+      
+      sensors.stats <- sensorStats(sensors.train.grouped)
+      #info.sensor.cols <- infoGainCols(sensors.stats)
+      info.gaing <- infoGainCols(sensors.stats)
+      info.sensor.cols <- info.gaing["cols_ranked"]$cols_ranked
+      info.sensor.perc <- info.gaing["cols_perc"]$cols_perc
+      
+      sensors.stats <- sensors.stats[info.sensor.cols]
+      keyboard.stats <- bind_cols(keyboard.stats, sensors.stats)
+      
+      info.cols <- c(info.cols, info.sensor.cols)
+      info.perc <-c(info.perc, info.sensor.perc)
+      
+    }
+    
+    df.variables <- rbind(
+      df.variables,
+      data.frame(
+        iter = row, 
+        no_var = info.cols,
+        pc_var = info.perc)
+    )
+    
+    card.train <- keyboard.stats
+    num_variables <- length(info.cols) -1
+    
+    
+    ##############
+    # II - login #
+    ##############
+    
+    keyboard.login <- keyboard.train %>%
+      filter(action_number == session_end + 1) %>%
+        group_by(user_id, character, action_number)
+    keyboard.login.stats <- getCharStats(keyboard.login)
+    keyboard.login.stats <- keyboard.login.stats[
+      c("user_id", info.keyboard.cols)]
+    
+    if (USE_SENSOR_DATA == T){
+      sensor.login.grouped <- sensors.train %>%
+        filter(action_number == session_end + 1) %>%
+        group_by(user_id, action_number)
+      
+      sensors.login.stats <- sensorStats(sensor.login.grouped)
+      sensors.login.stats <- sensors.login.stats[info.sensor.cols]
+      
+      keyboard.login.stats <- bind_cols(keyboard.login.stats, 
+          sensors.login.stats)
+    }
+    card.login <- keyboard.login.stats
+    
+    
+    ####################
+    # III - validation #
+    ####################
+    
+    keyboard.val <- keyboard_login %>% 
+      filter(user_id %in% ids.val)
+    
+    if (USE_SENSOR_DATA == T){
+      sensors.val <- sensors.login %>% 
+        filter(user_id %in% ids.val)
+    }
+    
+    keyboard.val.grouped <- keyboard.val %>%
+       group_by(user_id, character, action_number)
+    keyboard.val.stats <- getCharStats(keyboard.val.grouped, secao = T)
+    keyboard.val.stats <- keyboard.val.stats[c("user_id", info.keyboard.cols)]
+    
+    if (USE_SENSOR_DATA == T){
+      sensor.val.grouped <- sensors.val %>% group_by(user_id, action_number)
+      sensors.val.stats <- sensorStats(sensor.val.grouped)
+      sensors.val.stats <- sensors.val.stats[info.sensor.cols]
+      keyboard.val.stats <- bind_cols(keyboard.val.stats, sensors.val.stats)
+    }
+    
+    card.val <- keyboard.val.stats
+    
+    
+    
+    ###############
+    ### TRAIN #####
+    ###############
+    
+    x_train <- card.train[,-1]
+    y_train <- as.factor(card.train$user_id)
+    
+    x_login <- card.login[,-1]
+    y_login <- as.factor(card.login$user_id)
+    
+    x_val <- card.val[,-1]
+    y_val <- as.factor(card.val$user_id)
+    
+    # randomForest class w/ 5 sections
+    rf <- randomForest(
+        x_train, 
+        y_train, 
+        importance = T)
+    
+    # with k-fold
+    df.train <- card.train
+    df.train$user_id <- paste("u", df.train$user_id, sep = "")
+    control <- trainControl(method = "repeatedcv", 
+                            number = 10 ,
+                            repeats = 2,
+                            search = "grid",
+                            classProbs = T)
+    
+    gridsearch <- train(
+      user_id ~ .,
+      data = df.train ,
+      method = 'rf',
+      ntree = 100,
+      trControl = control
+    )
 
-
-# III- template creation (training)
-
-# keyboard data
-keyboard.train <- keyboard_login %>% 
-  filter(user_id %in% ids.train)
-
-
-if (USE_SENSOR_DATA == T){
-  # sensor data
-  sensors.train <- sensors.login  %>% 
-    filter(user_id %in% ids.train)
+    
+    # I. login try
+    
+    pred.class.login <- predict(object = rf, x_login, type ="class")
+    login_pos <- sum(pred.class.login == y_login)
+    login_neg <- sum(pred.class.login != y_login)
+    
+    pred.prob.login <- predict(object = rf, x_login, type ="prob")
+    max.probs.login <- apply(pred.prob.login, 1, max)
+    matched <- pred.class.login == y_login
+    login_pos_prob <- sum(matched[max.probs.login> 0.5])
+    login_neg_prob <- length(pred.class.login) - login_pos_prob
+    
+    
+    # II. attack try
+    pred.prob.val <- predict(object = rf, x_val, type ="prob")
+    max.probs <- apply(pred.prob.val, 1, max, na.rm=TRUE)
+    
+    attack_pos <- sum(max.probs > 0.5)
+    attack_neg <- length(max.probs) - attack_pos
+    
+      
+    # II. gridsearch
+    
+    # login
+    
+    df.login.y <- paste("u", y_login, sep = "")
+    
+    pred.class.kfold <- predict(gridsearch, x_login)
+    grd_login_pos <- sum(pred.class.kfold == df.login.y)
+    grd_login_neg <- sum(pred.class.kfold != df.login.y)
+    grd_login_acc <- grd_login_pos / length(df.login.y)
+    
+    pred.prob.kfold <- predict(gridsearch, x_login, type = 'prob')
+    max.probs.login.kfold <- apply(pred.prob.kfold, 1, max, na.rm=TRUE)
+    matched.kfold <- pred.class.kfold == df.login.y
+    
+    grd_login_pos_prob <- sum(matched.kfold[max.probs.login.kfold> 0.5])
+    grd_login_neg_prob <- length(df.login.y) - grd_login_pos_prob
+    
+    # attack 
+    
+    pred.prob.attack.kfold <- predict(gridsearch, x_val, type = 'prob')
+    max.probs.kfold <- apply(pred.prob.attack.kfold, 1, max, na.rm=TRUE) # max by row
+    
+    grd_attack_pos <- sum(max.probs.kfold > 0.5)
+    grd_attack_neg <- length(max.probs.kfold) - grd_attack_pos
+    
+    
+    df.results[row,] <- c(pc_train, iter, num_users,
+                          num_attackers,
+                          num_variables,
+                          login_pos,
+                          login_neg,
+                          login_pos_prob,
+                          login_neg_prob,
+                          attack_pos,
+                          attack_neg,
+                          grd_login_pos,
+                          grd_login_neg,
+                          grd_login_pos_prob,
+                          grd_login_neg_prob,
+                          grd_attack_pos,
+                          grd_attack_neg
+    )
+    row <- row + 1
+  }
 }
 
-# template
-keyboard.train.grouped <- keyboard.train %>%
-  filter(action_number >= session_start,
-         action_number <= session_end) %>%
-   group_by(user_id, character, action_number)
+write.csv(df.results,'result32-key-sens')
 
-keyboard.stats <- getCharStats(keyboard.train.grouped, secao = T)
-
-if (USE_SENSOR_DATA == T){
-  sensors.train.grouped <- sensors.train %>%  
-    filter(action_number >= session_start,
-           action_number <= session_end) %>%
-    group_by(user_id, action_number)
-  
-  sensors.stats <- sensorStats(sensors.train.grouped)
-  keyboard.stats <- bind_cols(keyboard.stats, sensors.stats[c(3:ncol(sensors.stats))])
-  
-}
-
-results.template <- getCardTemplate(keyboard.stats)
-card.train <- results.template$card
-
-
-# III - login
-keyboard.login <- keyboard.train %>%
-  filter(action_number == session_end + 1) %>%
-  group_by(user_id, character, action_number)
-keyboard.login.stats <- getCharStats(keyboard.login, secao = T)
-
-if (USE_SENSOR_DATA == T){
-  sensor.login.grouped <- sensors.train %>%
-    filter(action_number == session_end + 1) %>%
-    group_by(user_id, action_number)
-  
-  sensors.login.stats <- sensorStats(sensor.login.grouped)
-  keyboard.login.stats <- bind_cols(keyboard.login.stats, 
-        sensors.login.stats[c(3:ncol(sensors.login.stats))])
-  
-}
-
-
-results.login <- getCardTemplate(keyboard.login.stats, results.template$cols)
-card.login <- results.login$card
-
-# IV - validation
-
-keyboard.val <- keyboard_login %>% 
-  filter(user_id %in% ids.val)
-
-if (USE_SENSOR_DATA == T){
-  sensors.val <- sensors.login %>% 
-    filter(user_id %in% ids.val)
-}
-
-keyboard.val.grouped <- keyboard.val %>%
-  group_by(user_id, character, action_number)
-
-keyboard.val.stats <- getCharStats(keyboard.val.grouped, secao = T)
-
-if (USE_SENSOR_DATA == T){
-  sensor.val.grouped <- sensors.val %>%
-    group_by(user_id, action_number)
-  
-  sensors.val.stats <- sensorStats(sensor.val.grouped)
-  keyboard.val.stats <- bind_cols(keyboard.val.stats, 
-                                  sensors.val.stats[c(3:ncol(sensors.val.stats))])
-  
-}
-
-results.val <- getCardTemplate(keyboard.val.stats, results.template$cols)
-card.val <- results.val$card
-
-
-
-# TRAIN #####
-
-x_train <- card.train[,-1]
-y_train <- as.factor(card.train$user_id)
-
-x_login <- card.login[,-1]
-y_login <- as.factor(card.login$user_id)
-
-x_val <- card.val[,-1]
-y_val <- as.factor(card.val$user_id)
-
-# randomForest class
-rf <- randomForest(x_train, y_train)
-
-# with k-fold
-df.train <- card.train
-df.train$user_id <- paste("u", df.train$user_id, sep = "")
-control <- trainControl(method = "repeatedcv", 
-                        number = 10 ,
-                        repeats = 2,
-                        search = "grid",
-                        classProbs = T)
-
-gridsearch <- train(
-  user_id ~ .,
-  data = df.train ,
-  method = 'rf',
-  ntree = 100,
-  trControl = control
-)
-
-plot(gridsearch)
-gridsearch$results
-gridsearch$bestTune
-
-# I. just to realize train prob (unreal)
-# pred.prob.train <- predict(object = rf, x_train, type ="prob")
-# apply(pred.prob.train, 1, max, na.rm=TRUE) # max by row
-# pred.class.train <- predict(object = rf, x_train, type ="class")
-# print(pred.class.train)
-
-# II. login try
-pred.prob.login <- predict(object = rf, x_login, type ="prob")
-#print(apply(pred.prob.login, 1, max, na.rm=TRUE)) # max by row
-pred.class.login <- predict(object = rf, x_login, type ="class")
-#print(pred.class.login)
-sum(pred.class.login == y_login)/length(pred.class.login)
-
-# III. attack try
-pred.prob.val <- predict(object = rf, x_val, type ="prob")
-#max.probs <- apply(pred.prob.val, 1, max, na.rm=TRUE) # max by row
-pred.class.val <- predict(object = rf, x_val, type ="class")
-sum(as.character(pred.class.val) == as.character(y_val))/
-  length(pred.class.val)
-#sum(max.probs > 0.5)/length(max.probs)
-
-# IV. gridsearch
-
-df.login.y <- paste("u", y_login, sep = "")
-
-pred.prob.kfold <- predict(gridsearch, x_login, type = 'prob')
-print(apply(pred.prob.kfold, 1, max, na.rm=TRUE)) # max by row
-pred.class.kfold <- predict(gridsearch, x_login)
-sum(pred.class.kfold == df.login.y)/length(df.login.y)
-
-df.val.y <- paste("u", y_val, sep = "")
-
-pred.prob.attack.kfold <- predict(gridsearch, x_val, type = 'prob')
-print(apply(pred.prob.attack.kfold, 1, max, na.rm=TRUE)) # max by row
-pred.class.attack.kfold <- predict(gridsearch, x_val)
-sum(pred.class.attack.kfold == df.val.y)/length(df.val.y)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-# 
-# 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-# ######################
-# # Feature Extraction #
-# ######################
-# 
-# cols.not.na <-names(
-#   which(colSums(is.na(desc_login_chars)) == 0)
-#   )
-# # named as a card
-# card_chars <- desc_login_chars[cols.not.na]
-# 
-# # Correlation #
-# 
-# rho <- Hmisc::rcorr(
-#   as.matrix(card_chars[2:nrow(card_chars)]), type = "pearson"
-# )
-# corr_coef <- rho$r
-# corr_sig <- round(rho$P, 5)
-# 
-# chart.Correlation(card_chars[2:11])
-# chart.Correlation(card_chars[12:21])
-# chart.Correlation(card_chars[22:31])
-# chart.Correlation(card_chars[32:nrow(card_chars)])
-# 
-# 
-# # split into train and test beforehand
-# 
-# #shuffle ids
-# set.seed(42)
-# ids <- card_chars$user_id
-# ids <- sample(ids)
-# ind <- round(length(ids) * 0.90)
-# 
-# ids.train <-ids[1:ind]
-# ids.val <-ids[(ind+1):length(ids)]
-# 
-# # Information Gain Attribute Evaluator (IGAE) Weka
-# 
-# card_chars.train <- card_chars %>% filter(user_id %in% ids.train)
-# card_chars.test <- card_chars %>% filter(user_id %in% ids.val)
-# 
-# # save csv file
-# 
-# setwd('/home/jcscabral/Studies/UspEsalq/Tcc/projeto/pesquisa/code')
-# write_csv(card_chars.train, 'card_keyboard.csv')
-# 
-# 
-# # Ranked attributes by Weka InfoGainAttributeVal:
-# 
-# # Buriro's # threshold:
-# #   number os users / number os features
-# 
-# threshold.test <- length(ids)/ (ncol(card_chars.train) - 1)
-# 
-# 
-# # pc_train  | weka_igae_threshold
-# # 90%       | 0.09302326
-# 
-# 
-# # same weka result
-# result <- FSelectorRcpp::information_gain(
-#   formula = user_id ~ .,
-#   data = card_chars.train ,
-#   type = 'infogain'
-# )
-# 
-# cols_ranked  <- result %>%
-#   filter(importance >= threshold.test) %>% select(attributes)
-# 
-# 
-# # first
-# # cols_ranked <- c("user_id",
-# #   "y_sd_5", "y_vr_5", "ps_qm_8", "y_rg_5",
-# #   "ps_md_0", "ps_am_0", "ps_am_3", "y_mn_9", "y_fq_9", "dt_ir_5",
-# #   "y_cv_9", "dt_qm_1", "dt_qm_7")
-# 
-# cols_ranked <- c("user_id", as_vector(cols_ranked))
-# card_chars_ranked <- card_chars[cols_ranked]
-# 
-# 
-# 
-# ###############
-# # CLASSIFIERS #
-# ###############
-# 
-# # Naive Bayes ) (TODO?)
-# # NeuralNet (NN) (TODO?)
-# # RF - best results according the paper
-# 
-# # ----------------- #
-# # RF Random Forrest #
-# # ----------------- #
-# 
-# 
-# x_train <- card_chars_ranked %>% filter(user_id %in% ids.train)
-# y_train <- as.factor(x_train$user_id)
-# x_train <- x_train[,-1]
-# 
-# x_test <- card_chars_ranked %>% filter(user_id %in% ids.val)
-# y_test <- as.factor(x_test$user_id)
-# x_test <- x_test[,-1]
-# 
-# 
-# rf <- randomForest(x_train, y_train)
-# 
-# # get probs instead of argmax
-# results <- predict(object = rf, x_test, type ="class")
-# print(results)
-# results <- predict(object = rf, x_test, type ="prob")
-# print(apply(results, 1, max, na.rm=TRUE)) # max by row
-# 
-# 
-# # just to realize train prob
-# results <- predict(object = rf, x_train, type ="prob")
-# apply(results, 1, max, na.rm=TRUE) # max by row
-# results <- predict(object = rf, x_train, type ="class")
-# 
-# 
-# # Attack by section (More real)
-# # Intruder somehow trained along sections (1,2...7)
-# # Split by number action (section)
-# 
-# card_chars_ranked_section <- desc_login_chars_section[cols_ranked]
-# card_chars_ranked_section[is.na(card_chars_ranked_section)] <- 0.0
-# 
-# x_test_section <- card_chars_ranked_section %>%
-#   filter(user_id %in% ids.val)
-# 
-# results <- predict(object = rf, x_test_section, type ="prob")
-# apply(results, 1, max, na.rm=TRUE) # max by row
-# 
-# ### Results ###
-# # NOT REAL
-# # 1. Considering a real threshold 0,5:
-# #   high: 100% correct training and testing.
-# #   low:  small dataset.
-# #   can we improve that with sensors?
-# 
-# 
-# # FIVE sections are used to build the template
-# 
-# 
-# 
-# 
-# 
-# 
-# 
-# 
-# 
-# ########
-# # Cpf  #
-# ########
-# 
-# # Future studies
-# 
-# ##########
-# # Money  #
-# ##########
-# 
-# # Future studies
-# 
-# #################
-# # Cpf and Money #
-# #################
-# 
-# # Future studies
-# 
-# 
-# # PCA
-# # Before select variables, each data user is transformed
-# # in order to preserve its specific features.
-# 
-# # fatorial <- principal(card_chars[2:11] ,
-# #           nfactors = length(card_chars[2:11]),
-# #           rotate = "none",
-# #           scores = T)
-# #
-# # eigenvalues <- round(fatorial$values, 5)
-# # var_shared <-as.data.frame(fatorial$Vaccounted)
-# # fatorials_scores <- as.data.frame(fatorial$weights)
-# # factors <- fatorial$scores
-# #
-# # rho.factors <- Hmisc::rcorr(as.matrix(factors), type= "pearson")
-# # k <- sum(eigenvalues > 1)
-# # fatorial2 <- principal(card_chars[2:11] ,
-# #             nfactors = k,
-# #             rotate = "none",
-# #             scores = T)
-# 
-# 
-# 
-# 
-# 
-# 
-# 
-# 
-# 
-# 
-# 
-# 
-# 
-# 
-# 
-# 
-# 
-# 
-# 
-# 
-# 
-# 
-# ###########
-# # SENSORS #
-# ###########
-# 
-# files.last <- c('20240124', '20240125', '20240126')
-# 
-# sensors.total = NULL
-# 
-# for(file in files.last){
-# 
-#   path_day <- paste(path_parent, file, '/', sep = '')
-# 
-#   # sensors #
-#   full_path <- paste(path_day, sensors_file, sep = '')
-#   sensors <- fread(full_path)
-#   cnames <- c('user_id', 'action_number', 'app_action', 'sensor_type',
-#               'x', 'y', 'z', 'timestamp')
-#   names(sensors) <- cnames
-# 
-#   ids_completed <- unique(sensors[sensors$action_number == 7]$user_id)
-#   sensors.completed <- sensors %>% filter(user_id %in% ids_completed)
-# 
-#   if(is.null(sensors.total)){
-#     sensors.total <- sensors.completed
-#   }
-#   else{
-#     sensors.total <-rbind(sensors.total, sensors.completed)
-#   }
-# }
-# 
-# sensors <- NULL
-# sensors.completed <- NULL
-# 
-# ids_completed <- unique(sensors.total$user_id)
-# length(ids_completed) #31
-# 
-# sensors <- sensors.total %>% filter(user_id %in% ids_completed)
-# sensors.total =  NULL
-# 
-# sensors$w <- sqrt((sensors$x^2) + (sensors$y^2) + (sensors$z^2))
-# 
-# sensors$timestamp <- sensors$timestamp/1000000
-# # 139332168 | 237742206570000
-# 
-# # 40
-# df <- sensors[(sensors$user_id == 40) & (sensors$sensor_type == 1),] %>%
-#   select(c(9, 8))
-# write.csv(df, '/home/jcscabral/Studies/UspEsalq/pesquisa/sensors40')
-# 
-# 
-# # 41
-# write.csv(
-#   sensors[(sensors$user_id == 41) & (sensors$sensor_type == 1),] %>%
-#        select(c(9, 8)),
-#   '/home/jcscabral/Studies/UspEsalq/pesquisa/sensors41')
-# 
-# # 42
-# write.csv(
-#   sensors[(sensors$user_id == 42) & (sensors$sensor_type == 1),] %>%
-#     select(c(9, 8)),
-#   '/home/jcscabral/Studies/UspEsalq/pesquisa/sensors42')
-# 
-# # 50
-# write.csv(
-#   sensors[(sensors$user_id == 50) & (sensors$sensor_type == 1),] %>%
-#     select(c(9, 8)),
-#   '/home/jcscabral/Studies/UspEsalq/pesquisa/sensors50')
-# 
-# 
-# # 50
-# write.csv(
-#   sensors[(sensors$user_id == 50) & (sensors$sensor_type == 1),] %>%
-#     select(c(9, 8)),
-#   '/home/jcscabral/Studies/UspEsalq/pesquisa/sensors50')
+write.csv(df.variables,'variables32-key-sens')
