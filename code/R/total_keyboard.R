@@ -7,6 +7,7 @@ USE_SENSOR_DATA <-T
 # KEYBOARD #
 ############
 
+
 loadKeyboard <- function(loadFixed = F) {
 
   # Load ####
@@ -44,7 +45,7 @@ loadKeyboard <- function(loadFixed = F) {
   keyboard <- keyboard.total #%>% filter(user_id %in% ids_completed)
   keyboard.total =  NULL
   
-  if (loadFixed == F){
+  if (loadFixed == T){
     # fixed data
     keyboard <- rbind(keyboard, keyboard_data_20240119())
     keyboard <- rbind(keyboard, keyboard_data_20240122_20())
@@ -120,7 +121,7 @@ loadKeyboard <- function(loadFixed = F) {
 
 }
 
-keyboard <- loadKeyboard(T)
+keyboard <- loadKeyboard(F)
 ids_completed <- sort(unique(keyboard$user_id))
 
 # plot #######
@@ -256,6 +257,23 @@ keyboardStats <- function(dfdata, digit){
       y_rg =  rg(y) ,
       y_sk =  skewness(y) ,    
       y_ku = kurtosis(y)
+      
+      # # Pressure var
+      # y_md = median(pressure_var, na.rm = T),
+      # y_fq = qt(pressure_var, 1),
+      # y_tq = qt(pressure_var, 3),
+      # y_ir = IQR(pressure_var, na.rm = T),
+      # y_am = mean(pressure_var, na.rm = T),
+      # y_vr = var(pressure_var),
+      # y_sd = sd(pressure_var, na.rm = T),
+      # y_cv = cv(pressure_var, na.rm = T),
+      # y_se = se(pressure_var),
+      # y_mn = min(pressure_var, na.rm = T) ,
+      # y_mx = max(pressure_var, na.rm = T) ,
+      # y_qm = qm(pressure_var),
+      # y_rg = rg(pressure_var) ,
+      # y_sk = skewness(pressure_var) ,    
+      # y_ku = kurtosis(pressure_var)
     )
   return(card_stats)
 }
@@ -388,6 +406,7 @@ infoGainCols <- function(dbase){
 
 df.results <- data.frame(
   
+  cutoff = double(),
   pc_train = double(),
   iter = integer(),
   num_users = integer(),
@@ -426,6 +445,7 @@ PC_30 <- 0.3
 PC_50 <- 0.5
 PC_70 <- 0.7
 PC_90 <- 0.9
+CUTOFFS <- c(0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5) 
 percents <-c(PC_30, PC_50, PC_70, PC_90) 
 
 iters <- c(0,1)
@@ -564,8 +584,6 @@ for (pc_train in percents){
     
     card.val <- keyboard.val.stats
     
-    
-    
     ###############
     ### TRAIN #####
     ###############
@@ -602,75 +620,80 @@ for (pc_train in percents){
       trControl = control
     )
 
-    
-    # I. login try
-    
-    pred.class.login <- predict(object = rf, x_login, type ="class")
-    login_pos <- sum(pred.class.login == y_login)
-    login_neg <- sum(pred.class.login != y_login)
-    
-    pred.prob.login <- predict(object = rf, x_login, type ="prob")
-    max.probs.login <- apply(pred.prob.login, 1, max)
-    matched <- pred.class.login == y_login
-    login_pos_prob <- sum(matched[max.probs.login> 0.5])
-    login_neg_prob <- length(pred.class.login) - login_pos_prob
-    
-    
-    # II. attack try
-    pred.prob.val <- predict(object = rf, x_val, type ="prob")
-    max.probs <- apply(pred.prob.val, 1, max, na.rm=TRUE)
-    
-    attack_pos <- sum(max.probs > 0.5)
-    attack_neg <- length(max.probs) - attack_pos
-    
+    for (cutoff in CUTOFFS){
       
-    # II. gridsearch
-    
-    # login
-    
-    df.login.y <- paste("u", y_login, sep = "")
-    
-    pred.class.kfold <- predict(gridsearch, x_login)
-    grd_login_pos <- sum(pred.class.kfold == df.login.y)
-    grd_login_neg <- sum(pred.class.kfold != df.login.y)
-    grd_login_acc <- grd_login_pos / length(df.login.y)
-    
-    pred.prob.kfold <- predict(gridsearch, x_login, type = 'prob')
-    max.probs.login.kfold <- apply(pred.prob.kfold, 1, max, na.rm=TRUE)
-    matched.kfold <- pred.class.kfold == df.login.y
-    
-    grd_login_pos_prob <- sum(matched.kfold[max.probs.login.kfold> 0.5])
-    grd_login_neg_prob <- length(df.login.y) - grd_login_pos_prob
-    
-    # attack 
-    
-    pred.prob.attack.kfold <- predict(gridsearch, x_val, type = 'prob')
-    max.probs.kfold <- apply(pred.prob.attack.kfold, 1, max, na.rm=TRUE) # max by row
-    
-    grd_attack_pos <- sum(max.probs.kfold > 0.5)
-    grd_attack_neg <- length(max.probs.kfold) - grd_attack_pos
-    
-    
-    df.results[row,] <- c(pc_train, iter, num_users,
-                          num_attackers,
-                          num_variables,
-                          login_pos,
-                          login_neg,
-                          login_pos_prob,
-                          login_neg_prob,
-                          attack_pos,
-                          attack_neg,
-                          grd_login_pos,
-                          grd_login_neg,
-                          grd_login_pos_prob,
-                          grd_login_neg_prob,
-                          grd_attack_pos,
-                          grd_attack_neg
-    )
-    row <- row + 1
+      # I. login try
+      
+      pred.class.login <- predict(object = rf, x_login, type ="class")
+      login_pos <- sum(pred.class.login == y_login)
+      login_neg <- sum(pred.class.login != y_login)
+      
+      pred.prob.login <- predict(object = rf, x_login, type ="prob")
+      max.probs.login <- apply(pred.prob.login, 1, max)
+      matched <- pred.class.login == y_login
+      login_pos_prob <- sum(matched[max.probs.login> cutoff])
+      login_neg_prob <- length(pred.class.login) - login_pos_prob
+      
+      
+      # II. attack try
+      pred.prob.val <- predict(object = rf, x_val, type ="prob")
+      max.probs <- apply(pred.prob.val, 1, max, na.rm=TRUE)
+      
+      attack_pos <- sum(max.probs > cutoff)
+      attack_neg <- length(max.probs) - attack_pos
+      
+        
+      # II. gridsearch
+      
+      # login
+      
+      df.login.y <- paste("u", y_login, sep = "")
+      
+      pred.class.kfold <- predict(gridsearch, x_login)
+      grd_login_pos <- sum(pred.class.kfold == df.login.y)
+      grd_login_neg <- sum(pred.class.kfold != df.login.y)
+      grd_login_acc <- grd_login_pos / length(df.login.y)
+      
+      pred.prob.kfold <- predict(gridsearch, x_login, type = 'prob')
+      max.probs.login.kfold <- apply(pred.prob.kfold, 1, max, na.rm=TRUE)
+      matched.kfold <- pred.class.kfold == df.login.y
+      
+      grd_login_pos_prob <- sum(matched.kfold[max.probs.login.kfold> cutoff])
+      grd_login_neg_prob <- length(df.login.y) - grd_login_pos_prob
+      
+      # attack 
+      
+      pred.prob.attack.kfold <- predict(gridsearch, x_val, type = 'prob')
+      max.probs.kfold <- apply(pred.prob.attack.kfold, 1, max, na.rm=TRUE) # max by row
+      
+      grd_attack_pos <- sum(max.probs.kfold > cutoff)
+      grd_attack_neg <- length(max.probs.kfold) - grd_attack_pos
+      
+      
+      df.results[row,] <- c(cutoff,
+                            pc_train, 
+                            iter, 
+                            num_users,
+                            num_attackers,
+                            num_variables,
+                            login_pos,
+                            login_neg,
+                            login_pos_prob,
+                            login_neg_prob,
+                            attack_pos,
+                            attack_neg,
+                            grd_login_pos,
+                            grd_login_neg,
+                            grd_login_pos_prob,
+                            grd_login_neg_prob,
+                            grd_attack_pos,
+                            grd_attack_neg
+      )
+      row <- row + 1
+    }
   }
 }
 
 write.csv(df.results,'result32-key-sens')
 
-write.csv(df.variables,'variables32-key-sens')
+write.csv(df.variables,'variables52-key')
