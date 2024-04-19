@@ -1,7 +1,7 @@
 
 # Reference: (Buriro, 2017)
 
-USE_SENSOR_DATA <-T
+USE_SENSOR_DATA <-F
 
 ############
 # KEYBOARD #
@@ -448,6 +448,7 @@ PC_90 <- 0.9
 CUTOFFS <- c(0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5) 
 percents <-c(PC_30, PC_50, PC_70, PC_90) 
 
+cutoff <- 0.5
 iters <- c(0,1)
 row <- 1
 for (pc_train in percents){
@@ -514,7 +515,9 @@ for (pc_train in percents){
       info.sensor.perc <- info.gaing["cols_perc"]$cols_perc
       
       sensors.stats <- sensors.stats[info.sensor.cols]
-      keyboard.stats <- bind_cols(keyboard.stats, sensors.stats)
+      #TODO
+      #keyboard.stats <- bind_cols(keyboard.stats, sensors.stats)
+      keyboard.stats <- bind_cols(keyboard.stats["user_id"], sensors.stats)
       
       info.cols <- c(info.cols, info.sensor.cols)
       info.perc <-c(info.perc, info.sensor.perc)
@@ -620,7 +623,7 @@ for (pc_train in percents){
       trControl = control
     )
 
-    for (cutoff in CUTOFFS){
+    #for (cutoff in CUTOFFS){
       
       # I. login try
       
@@ -690,10 +693,10 @@ for (pc_train in percents){
                             grd_attack_neg
       )
       row <- row + 1
-    }
+    #}
   }
 }
 
-write.csv(df.results,'result32-key-sens')
+write.csv(df.results,'result32-sens')
 
 write.csv(df.variables,'variables52-key')
